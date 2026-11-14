@@ -31,22 +31,29 @@ jobs:
         echo "Listing contents of extracted directory:"
         ls -la extracted_project
 
-    - name: Find and Build with Gradle
+    - name: Build APK with Gradle
       run: |
-        # Find the directory containing gradlew
-        GRADLEW_PATH=$(find extracted_project -name "gradlew" -type f | head -n 1)
+        cd extracted_project
         
-        if [ -z "$GRADLEW_PATH" ]; then
-          echo "Error: gradlew file not found inside the extracted ZIP!"
-          exit 1
+        # Check if gradlew exists in the extracted files
+        if [ -f "gradlew" ]; then
+          chmod +x gradlew
+          ./gradlew assembleDebug
+        elif find . -name "gradlew" -type f | grep -q .; then
+          GRADLEW_PATH=$(find . -name "gradlew" -type f | head -n 1)
+          cd "$(dirname "$GRADLEW_PATH")"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+        else
+          echo "gradlew not found. Installing system Gradle to build..."
+          sudo apt-get update && sudo apt-get install -y gradle
+          
+          BUILD_FILE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          if [ -n "$BUILD_FILE" ]; then
+            cd "$(dirname "$BUILD_FILE")"
+          fi
+          gradle assembleDebug
         fi
-        
-        PROJECT_DIR=$(dirname "$GRADLEW_PATH")
-        echo "Found project directory at: $PROJECT_DIR"
-        
-        cd "$PROJECT_DIR"
-        chmod +x gradlew
-        ./gradlew assembleDebug
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
